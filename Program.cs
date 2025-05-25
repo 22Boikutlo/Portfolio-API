@@ -1,3 +1,4 @@
+using Microsoft.Extensions.FileProviders;
 using Newtonsoft.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -40,5 +41,10 @@ app.UseCors("AllowAllOrigins");
 app.UseAuthorization();
 
 app.MapControllers();
+app.UseStaticFiles(new StaticFileOptions {
+    FileProvider = new PhysicalFileProvider(
+    Path.Combine(Directory.GetCurrentDirectory(), "Images")),
+    RequestPath = "/Images"
+});
 
 app.Run();

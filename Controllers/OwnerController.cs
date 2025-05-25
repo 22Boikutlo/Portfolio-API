@@ -11,9 +11,11 @@ namespace PortfolioAPI.Controllers
     public class OwnerController : ControllerBase
     {
         private readonly IConfiguration _configuration;
-        public OwnerController(IConfiguration configuration)
+        private readonly IWebHostEnvironment _webHostEnvironment;
+        public OwnerController(IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
             _configuration = configuration;
+            _webHostEnvironment = webHostEnvironment;
         }
 
         [HttpGet]
@@ -145,6 +147,27 @@ namespace PortfolioAPI.Controllers
                 }
             }
             return new JsonResult("Deleted Successfully");
+        }
+        [Route("Save File")]
+        [HttpPost]
+        public JsonResult SaveFile(IFormFile file)
+        {
+            try
+            {
+               var httpRequest = Request.Form;
+                var postedFile = httpRequest.Files[0];
+                string fileName = postedFile.FileName;
+                var physicalPath = _webHostEnvironment.ContentRootPath + "/Images/" + fileName;
+                using (var stream = new FileStream(physicalPath, FileMode.Create))
+                {
+                    postedFile.CopyTo(stream);
+                }
+                return new JsonResult(fileName);
+            }
+            catch (Exception ex)
+            {
+                return new JsonResult($"Error: {ex.Message}");
+            }
         }
     }
 }
