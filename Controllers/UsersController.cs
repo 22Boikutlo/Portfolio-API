@@ -1,48 +1,88 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using PortfolioAPI.Models;
 
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-
-namespace DemoApi.Controllers
+namespace PortfolioAPI.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
-    public class UsersController : ControllerBase
+    [Route("api/[controller]")]
+    public class UserController : ControllerBase
     {
-        ///GENERIC GET THAT GET ALL THE DATA
-        // GET: api/Users
-        [HttpGet]
-        public IEnumerable<string> Get()
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly IConfiguration _configuration;
+
+        public UserController(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
+            IConfiguration configuration)
         {
-            return new string[] { "value1", "value2" };
-        }
-        
-        /// GET USER BY ID       
-        // GET api/Users/5
-        [HttpGet("{id}")]
-        public string Get(int id)
-        {
-            return $"value {id}";
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _configuration = configuration;
         }
 
-        //GENERIC POST THAT CREATE A NEW USER
-        // POST api/Users
-        [HttpPost]
-        public void Post([FromBody] string value)
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] RegisterModel model)
         {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userExists = await _userManager.FindByEmailAsync(model.Email);
+            if (userExists != null)
+                return BadRequest(new { message = "User already exists!" });
+
+            var user = new ApplicationUser
+            {
+                Email = model.Email,
+                UserName = model.Email,
+                SecurityStamp = Guid.NewGuid().ToString()
+            };
+
+            var result = await _userManager.CreateAsync(user, model.Password);
+            if (!result.Succeeded)
+                return BadRequest(result.Errors);
+
+            return Ok(new { message = "User registered successfully" });
         }
 
-        //GENERIC PUT THAT UPDATE A USER
-        // PUT api/Users/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LogInModel model)
         {
-        }
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-        //GENERIC DELETE THAT DELETE A USER
-        // DELETE api/Users/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
-        {
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null || !await _userManager.CheckPasswordAsync(user, model.Password))
+                return Unauthorized(new { message = "Invalid credentials" });
+
+            var authClaims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
+
+            var authSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(_configuration["Jwt:Key"])
+            );
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                expires: DateTime.Now.AddHours(3),
+                claims: authClaims,
+                signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+            );
+
+            return Ok(new
+            {
+                token = new JwtSecurityTokenHandler().WriteToken(token),
+                expiration = token.ValidTo
+            });
         }
     }
 }

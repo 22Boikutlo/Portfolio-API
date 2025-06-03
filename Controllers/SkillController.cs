@@ -48,7 +48,7 @@ namespace PortfolioAPI.Controllers
         {
             string query = @"
                 INSERT INTO dbo.Skills (SkillName, SkillDescription, WebAddress, SelfRating)
-                VALUES (@SkillName, @SkillDescription, @WebAddress)";
+                VALUES (@SkillName, @SkillDescription, @WebAddress, @SelfRating)";
             DataTable _table = new DataTable();
             // Retrieve the connection string from the configuration
             string _sqlDataSource = _configuration.GetConnectionString("PortfolioCon");
